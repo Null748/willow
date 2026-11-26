@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Willow</title>
+<meta name="description" content="Search the web and open any page through Willow.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --mist: #e9efea;
+    --paper: #f6f9f6;
+    --ink: #17261f;
+    --ink-soft: #566860;
+    --leaf: #4f7d53;
+    --leaf-strong: #3b6340;
+    --water: #b5cfca;
+    --line: rgba(23, 38, 31, .14);
+    --shadow: 0 1px 2px rgba(23, 38, 31, .06), 0 12px 32px -12px rgba(23, 38, 31, .18);
+    --serif: "Fraunces", Georgia, serif;
+    --sans: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --mist: #0f1a16;
+      --paper: #17251f;
+      --ink: #e4eee7;
+      --ink-soft: #9db0a5;
+      --leaf: #8dbb8a;
+      --leaf-strong: #a9d0a5;
+      --water: #2c4a46;
+      --line: rgba(228, 238, 231, .14);
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 32px -12px rgba(0, 0, 0, .6);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--mist);
+    color: var(--ink);
+    font: 400 16px/1.55 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  [hidden] { display: none !important; }
+  button, input { font: inherit; color: inherit; }
+  a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--leaf); outline-offset: 2px; }
+
+  /* ---------- Home ---------- */
+  #home { position: relative; min-height: 100%; overflow: hidden; display: grid; place-items: center; padding: 2rem 1.25rem; }
+  #strands {
+    position: absolute; inset: 0 0 auto 0; width: 100%; height: 58vh;
+    color: var(--leaf); pointer-events: none;
+    -webkit-mask-image: linear-gradient(#000 55%, transparent);
+            mask-image: linear-gradient(#000 55%, transparent);
+  }
+  #strands path { fill: none; stroke: currentColor; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 2.4s cubic-bezier(.2, .7, .2, 1) forwards; }
+  #strands circle { fill: currentColor; opacity: 0; animation: bud .6s ease forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  @keyframes bud { to { opacity: .8; } }
+  @media (prefers-reduced-motion: reduce) {
+    #strands path { animation: none; stroke-dashoffset: 0; }
+    #strands circle { animation: none; opacity: .8; }
+  }
+  .hero { position: relative; width: min(40rem, 100%); text-align: center; margin-top: 12vh; }
+  .wordmark {
+    margin: 0 0 1.75rem;
+    font-family: var(--serif); font-style: italic; font-weight: 400;
+    font-size: clamp(4.5rem, 15vw, 8.5rem); line-height: 1; letter-spacing: -.035em;
+    font-variation-settings: "opsz" 144;
+  }
+  .hint { margin: 1.1rem 0 0; color: var(--ink-soft); font-size: .9rem; }
+  kbd { font: 500 .8rem var(--sans); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; padding: .05rem .4rem; background: var(--paper); }
+
+  .search {
+    display: flex; align-items: center; gap: .5rem;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 999px;
+    padding: .4rem .4rem .4rem 1.25rem; box-shadow: var(--shadow);
+    transition: border-color .15s;
+  }
+  .search:focus-within { border-color: var(--leaf); }
+  .search input { flex: 1; min-width: 0; border: 0; background: transparent; outline: 0; padding: .7rem 0; font-size: 1.05rem; }
+  .search input::placeholder { color: var(--ink-soft); }
+  .search button {
+    border: 0; border-radius: 999px; cursor: pointer; background: var(--leaf); color: #fff;
+    font-weight: 600; padding: .7rem 1.4rem; transition: background .15s;
+  }
+  @media (prefers-color-scheme: dark) { .search button { color: #0f1a16; } }
+  .search button:hover { background: var(--leaf-strong); }
+
+  /* ---------- Results ---------- */
+  #results { min-height: 100%; }
+  .topbar {
+    position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 1.25rem;
+    padding: .9rem clamp(1rem, 4vw, 2.5rem); background: color-mix(in srgb, var(--mist) 88%, transparent);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line);
+  }
+  .mark { font-family: var(--serif); font-style: italic; font-size: 1.9rem; letter-spacing: -.03em; text-decoration: none; line-height: 1; }
+  .topbar .search { flex: 1; max-width: 42rem; box-shadow: none; }
+  .topbar .search input { padding: .5rem 0; }
+  .topbar .search button { padding: .5rem 1.1rem; }
+  .col { width: min(46rem, 100%); margin: 0 auto; padding: 1.5rem clamp(1rem, 4vw, 2.5rem) 4rem; }
+  .meta { color: var(--ink-soft); font-size: .9rem; margin: 0 0 1.25rem; }
+  .meta a { color: var(--leaf-strong); }
+  .hit { padding: 1rem 0 1.15rem; border-bottom: 1px solid var(--line); }
+  .hit:last-child { border-bottom: 0; }
+  .src { display: flex; align-items: center; gap: .55rem; color: var(--ink-soft); font-size: .85rem; margin-bottom: .2rem; }
+  .src img { width: 18px; height: 18px; border-radius: 4px; background: var(--water); }
+  .src .age::before { content: "•"; margin-right: .55rem; }
+  .src .direct { margin-left: auto; color: var(--ink-soft); text-underline-offset: 3px; }
+  .title { display: inline-block; font-family: var(--serif); font-size: 1.3rem; font-weight: 600; line-height: 1.3; text-decoration: none; color: var(--leaf-strong); font-variation-settings: "opsz" 36; }
+  .title:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .hit p { margin: .3rem 0 0; color: var(--ink-soft); max-width: 65ch; }
+  .skeleton { height: 5.5rem; margin: 1rem 0; border-radius: 10px; background: linear-gradient(90deg, var(--line), transparent, var(--line)); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+  .notice { margin: 2rem 0; padding: 1.1rem 1.25rem; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+  .notice strong { display: block; margin-bottom: .15rem; }
+  .pager { display: flex; align-items: center; justify-content: space-between; margin-top: 1.5rem; }
+  .pager button { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: .55rem 1.2rem; cursor: pointer; font-weight: 500; }
+  .pager button:hover:not(:disabled) { border-color: var(--leaf); }
+  .pager button:disabled { opacity: .4; cursor: default; }
+  .pager span { color: var(--ink-soft); font-size: .9rem; }
+
+  /* ---------- Site viewer ---------- */
+  #site { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--paper); }
+  .viewbar { display: flex; align-items: center; gap: .6rem; padding: .55rem .9rem; background: var(--mist); border-bottom: 1px solid var(--line); }
+  .viewbar .mark { font-size: 1.5rem; margin-right: .25rem; }
+  .icon-btn { display: inline-flex; align-items: center; gap: .4rem; border: 1px solid transparent; background: transparent; border-radius: 999px; padding: .45rem .8rem; cursor: pointer; font-weight: 500; font-size: .9rem; white-space: nowrap; text-decoration: none; }
+  .icon-btn:hover { background: var(--paper); border-color: var(--line); }
+  .icon-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .addr { flex: 1; min-width: 0; display: flex; }
+  .addr input { width: 100%; border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: .5rem 1rem; outline: 0; font-size: .92rem; }
+  .addr input:focus { border-color: var(--leaf); }
+  #bar { height: 2px; background: var(--leaf); transform-origin: left; transform: scaleX(0); opacity: 0; }
+  #bar.on { opacity: 1; transform: scaleX(.85); transition: transform 8s cubic-bezier(.1, .8, .2, 1); }
+  #bar.done { opacity: 0; transform: scaleX(1); transition: transform .2s, opacity .4s .2s; }
+  #frame { flex: 1; width: 100%; border: 0; background: #fff; }
+  @media (max-width: 640px) { .viewbar .label, .viewbar .mark { display: none; } }
+</style>
+</head>
+<body>
+
+<main id="home">
+  <svg id="strands" viewBox="0 0 1000 420" preserveAspectRatio="xMidYMin slice" aria-hidden="true"></svg>
+  <div class="hero">
+    <h1 class="wordmark">willow</h1>
+    <form class="search" id="home-form" role="search">
+      <input id="home-q" type="search" placeholder="Search the web or enter an address" autocomplete="off" autofocus aria-label="Search">
+      <button type="submit">Search</button>
+    </form>
+    <p class="hint">Results come from Brave. Every page opens through Willow. Press <kbd>/</kbd> to search.</p>
+  </div>
+</main>
+
+<div id="results" hidden>
+  <header class="topbar">
+    <a class="mark" href="/" id="to-home">willow</a>
+    <form class="search" id="top-form" role="search">
+      <input id="top-q" type="search" autocomplete="off" aria-label="Search">
+      <button type="submit">Search</button>
+    </form>
+  </header>
+  <div class="col">
+    <p class="meta" id="meta" aria-live="polite"></p>
+    <div id="list"></div>
+    <nav class="pager" id="pager" hidden aria-label="Pages">
+      <button type="button" id="prev">Previous</button>
+      <span id="pageno"></span>
+      <button type="button" id="next">Next</button>
+    </nav>
+  </div>
+</div>
+
+<section id="site" hidden aria-label="Page viewer">
+  <div class="viewbar">
+    <a class="mark" href="/">willow</a>
+    <button class="icon-btn" id="back" type="button" title="Back to results">
+      <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg><span class="label">Results</span>
+    </button>
+    <button class="icon-btn" id="reload" type="button" title="Reload">
+      <svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg><span class="label">Reload</span>
+    </button>
+    <form class="addr" id="addr-form"><input id="addr" type="text" autocomplete="off" spellcheck="false" aria-label="Address"></form>
+    <a class="icon-btn" id="original" href="#" target="_blank" rel="noopener noreferrer" title="Open the original site in a new tab">
+      <svg viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg><span class="label">Original</span>
+    </a>
+  </div>
+  <div id="bar"></div>
+  <iframe id="frame" title="Proxied page" referrerpolicy="no-referrer" allow="fullscreen" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads"></iframe>
+</section>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const views = { home: $('#home'), results: $('#results'), site: $('#site') };
+  const frame = $('#frame'), addr = $('#addr'), bar = $('#bar');
+  let last = { q: '', p: 0 };
+  let ticket = 0;
+
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const proxied = (u) => '/api/proxy?url=' + encodeURIComponent(u);
+  const looksLikeUrl = (s) => /^https?:\/\//i.test(s) || /^(?!.*\s)([a-z0-9-]+\.)+[a-z]{2,}(:\d+)?(\/\S*)?$/i.test(s);
+  const toUrl = (s) => (/^https?:\/\//i.test(s) ? s : 'https://' + s);
+
+  /* ----- willow strands (drawn once on load) ----- */
+  (function drawStrands() {
+    const svg = $('#strands');
+    const n = 30;
+    let out = '';
+    for (let i = 0; i < n; i++) {
+      const x = (i + .5) * (1000 / n) + (Math.random() - .5) * 18;
+      const len = 150 + Math.random() * 230;
+      const sway = (Math.random() - .5) * 70;
+      const x2 = x + sway;
+      const d = `M${x.toFixed(1)} -10 C${(x + sway * .1).toFixed(1)} ${(len * .35).toFixed(1)} ${(x2 - sway * .6).toFixed(1)} ${(len * .7).toFixed(1)} ${x2.toFixed(1)} ${len.toFixed(1)}`;
+      const delay = (Math.random() * .9).toFixed(2);
+      const w = (1 + Math.random() * 1.4).toFixed(1);
+      out += `<path pathLength="1" d="${d}" stroke-width="${w}" style="animation-delay:${delay}s;opacity:${(.35 + Math.random() * .55).toFixed(2)}"/>`;
+      out += `<circle cx="${x2.toFixed(1)}" cy="${len.toFixed(1)}" r="${(1.6 + Math.random() * 1.6).toFixed(1)}" style="animation-delay:${(+delay + 1.9).toFixed(2)}s"/>`;
+    }
+    svg.innerHTML = out;
+  })();
+
+  /* ----- routing: ?q=..&p=.. for results, ?u=.. for a page ----- */
+  function go(params, replace) {
+    const qs = new URLSearchParams(params).toString();
+    history[replace ? 'replaceState' : 'pushState'](null, '', qs ? '?' + qs : location.pathname);
+    route();
+  }
+  function route() {
+    const p = new URLSearchParams(location.search);
+    if (p.get('u')) showSite(p.get('u'));
+    else if (p.get('q')) showResults(p.get('q'), parseInt(p.get('p'), 10) || 0);
+    else showHome();
+  }
+  function show(name) {
+    for (const [k, el] of Object.entries(views)) el.hidden = k !== name;
+    document.body.dataset.view = name;
+  }
+  function submitQuery(value) {
+    const v = value.trim();
+    if (!v) return;
+    looksLikeUrl(v) ? go({ u: toUrl(v) }) : go({ q: v });
+  }
+
+  function showHome() {
+    show('home');
+    document.title = 'Willow';
+    frame.removeAttribute('src');
+    delete frame.dataset.cur;
+    $('#home-q').focus();
+  }
+
+  async function showResults(q, p) {
+    show('results');
+    last = { q, p };
+    frame.removeAttribute('src');
+    delete frame.dataset.cur;
+    document.title = q + ' — Willow';
+    $('#top-q').value = q;
+    $('#pager').hidden = true;
+    $('#meta').textContent = '';
+    $('#list').innerHTML = '<div class="skeleton"></div>'.repeat(5);
+    const mine = ++ticket;
+    try {
+      const r = await fetch('/api/search?q=' + encodeURIComponent(q) + '&page=' + p);
+      const data = await r.json();
+      if (mine !== ticket) return;
+      if (!r.ok) throw new Error(data.error || 'Search failed.');
+      renderResults(data);
+    } catch (err) {
+      if (mine !== ticket) return;
+      $('#list').innerHTML = `<div class="notice"><strong>Search didn’t go through</strong>${esc(err.message)}</div>`;
+    }
+  }
+
+  function renderResults(d) {
+    $('#meta').innerHTML = d.altered
+      ? `Showing results for <a href="?q=${encodeURIComponent(d.altered)}">${esc(d.altered)}</a>`
+      : '';
+    if (!d.results.length) {
+      $('#list').innerHTML = `<div class="notice"><strong>No results for “${esc(d.query)}”</strong>Try different words or a more general search.</div>`;
+      return;
+    }
+    $('#list').innerHTML = d.results.map((r) => `
+      <article class="hit">
+        <div class="src">
+          ${r.favicon ? `<img src="${esc(proxied(r.favicon))}" alt="" width="18" height="18" loading="lazy" onerror="this.remove()">` : ''}
+          <span>${esc(r.host)}</span>${r.age ? `<span class="age">${esc(r.age)}</span>` : ''}
+          <a class="direct" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Open directly</a>
+        </div>
+        <a class="title" href="?u=${encodeURIComponent(r.url)}" data-u="${esc(r.url)}">${esc(r.title)}</a>
+        ${r.description ? `<p>${esc(r.description)}</p>` : ''}
+      </article>`).join('');
+    $('#pager').hidden = d.page === 0 && !d.hasMore;
+    $('#prev').disabled = d.page === 0;
+    $('#next').disabled = !d.hasMore;
+    $('#pageno').textContent = 'Page ' + (d.page + 1);
+    window.scrollTo(0, 0);
+  }
+
+  function showSite(url) {
+    show('site');
+    addr.value = url;
+    $('#original').href = url;
+    if (frame.dataset.cur === url) return;
+    frame.dataset.cur = url;
+    bar.className = '';
+    void bar.offsetWidth;
+    bar.className = 'on';
+    frame.src = proxied(url);
+  }
+
+  /* ----- events ----- */
+  $('#home-form').addEventListener('submit', (e) => { e.preventDefault(); submitQuery($('#home-q').value); });
+  $('#top-form').addEventListener('submit', (e) => { e.preventDefault(); submitQuery($('#top-q').value); });
+  $('#addr-form').addEventListener('submit', (e) => { e.preventDefault(); submitQuery(addr.value); });
+  $('#to-home').addEventListener('click', (e) => { e.preventDefault(); go({}); });
+  $('#prev').addEventListener('click', () => go({ q: last.q, p: Math.max(0, last.p - 1) }));
+  $('#next').addEventListener('click', () => go({ q: last.q, p: last.p + 1 }));
+  $('#back').addEventListener('click', () => (last.q ? go({ q: last.q, p: last.p }) : go({})));
+  $('#reload').addEventListener('click', () => {
+    bar.className = ''; void bar.offsetWidth; bar.className = 'on';
+    try { frame.contentWindow.location.reload(); } catch { frame.src = frame.src; }
+  });
+  $('#list').addEventListener('click', (e) => {
+    const a = e.target.closest('a.title');
+    if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    go({ u: a.dataset.u });
+  });
+  frame.addEventListener('load', () => { bar.className = 'done'; });
+  addEventListener('popstate', route);
+  addEventListener('message', (e) => {
+    if (e.origin !== location.origin || e.source !== frame.contentWindow) return;
+    const d = e.data;
+    if (!d || d.type !== 'willow:nav' || !d.url) return;
+    addr.value = d.url;
+    frame.dataset.cur = d.url;
+    $('#original').href = d.url;
+    if (d.title) document.title = d.title + ' — Willow';
+    history.replaceState(null, '', '?u=' + encodeURIComponent(d.url));
+  });
+  addEventListener('keydown', (e) => {
+    if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (/^(input|textarea)$/i.test(document.activeElement.tagName)) return;
+    const el = document.body.dataset.view === 'results' ? $('#top-q') : document.body.dataset.view === 'site' ? addr : $('#home-q');
+    e.preventDefault(); el.focus(); el.select();
+  });
+
+  route();
+})();
+</script>
+</body>
+</html>
