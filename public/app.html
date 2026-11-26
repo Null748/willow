@@ -142,6 +142,29 @@
   #frame { flex: 1; width: 100%; border: 0; background: #fff; }
   @media (max-width: 640px) { .viewbar .label, .viewbar .mark { display: none; } }
   .embedded .viewbar, .embedded .topbar { display: none; }
+
+  .col.wide { width: min(76rem, 100%); }
+  .types { display: flex; gap: .25rem; margin: 0 0 1rem; border-bottom: 1px solid var(--line); }
+  .types button { border: 0; background: none; padding: .6rem .95rem; margin-bottom: -1px; cursor: pointer; color: var(--ink-soft); font-weight: 500; border-bottom: 2px solid transparent; }
+  .types button:hover { color: var(--ink); }
+  .types button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--leaf); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr)); gap: .75rem; }
+  .grid .skeleton { height: auto; aspect-ratio: 4 / 3; margin: 0; }
+  .tile { position: relative; display: block; padding: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; cursor: zoom-in; background: var(--water); aspect-ratio: 4 / 3; }
+  .tile img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .tile span { position: absolute; left: 0; right: 0; bottom: 0; padding: 1.1rem .6rem .4rem; color: #fff; font-size: .78rem; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: linear-gradient(transparent, rgba(0, 0, 0, .62)); opacity: 0; transition: opacity .15s; }
+  .tile:hover span, .tile:focus-visible span { opacity: 1; }
+
+  #lb { position: fixed; inset: 0; z-index: 30; display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: .75rem; padding: 1rem; background: rgba(8, 14, 11, .88); }
+  #lb-img { max-width: 100%; max-height: 100%; margin: auto; object-fit: contain; border-radius: 6px; }
+  .lb-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1rem; color: #e4eee7; }
+  .lb-text { flex: 1; min-width: 12rem; }
+  #lb-title { font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  #lb-src { font-size: .85rem; opacity: .75; }
+  .lb-btn { border: 1px solid rgba(228, 238, 231, .35); background: transparent; color: #e4eee7; border-radius: 999px; padding: .5rem 1.1rem; cursor: pointer; font-weight: 500; text-decoration: none; }
+  .lb-btn:hover { background: rgba(228, 238, 231, .12); }
+  .lb-btn.primary { background: var(--leaf); border-color: var(--leaf); color: #0f1a16; }
 </style>
 </head>
 <body>
@@ -154,7 +177,7 @@
       <input id="home-q" type="search" placeholder="Search the web or enter an address" autocomplete="off" autofocus aria-label="Search">
       <button type="submit">Search</button>
     </form>
-    <p class="hint">Results come from Google. Every page opens through Willow. Press <kbd>/</kbd> to search.</p>
+    <p class="hint">Results come from Brave. Every page opens through Willow. Press <kbd>/</kbd> to search.</p>
   </div>
 </main>
 
@@ -166,7 +189,11 @@
       <button type="submit">Search</button>
     </form>
   </header>
-  <div class="col">
+  <div class="col" id="col">
+    <nav class="types" id="types" role="tablist" aria-label="Result type">
+      <button type="button" role="tab" data-type="web" aria-selected="true">All</button>
+      <button type="button" role="tab" data-type="images" aria-selected="false">Images</button>
+    </nav>
     <p class="meta" id="meta" aria-live="polite"></p>
     <div id="list"></div>
     <nav class="pager" id="pager" hidden aria-label="Pages">
@@ -195,12 +222,22 @@
   <iframe id="frame" title="Proxied page" referrerpolicy="no-referrer" allow="fullscreen" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads"></iframe>
 </section>
 
+<div id="lb" role="dialog" aria-modal="true" aria-label="Image preview" hidden>
+  <img id="lb-img" alt="">
+  <div class="lb-bar">
+    <div class="lb-text"><div id="lb-title"></div><div id="lb-src"></div></div>
+    <button class="lb-btn primary" id="lb-visit" type="button">Visit page</button>
+    <a class="lb-btn" id="lb-open" href="#" target="_blank" rel="noopener noreferrer">Open image</a>
+    <button class="lb-btn" id="lb-close" type="button">Close</button>
+  </div>
+</div>
+
 <script>
 (() => {
   const $ = (s) => document.querySelector(s);
   const views = { home: $('#home'), results: $('#results'), site: $('#site') };
   const frame = $('#frame'), addr = $('#addr'), bar = $('#bar');
-  let last = { q: '', p: 0 };
+  let last = { q: '', p: 0, t: 'web' };
   let ticket = 0;
   const embedded = window.parent !== window;
   if (embedded) document.body.classList.add('embedded');
@@ -238,7 +275,7 @@
   function route() {
     const p = new URLSearchParams(location.search);
     if (p.get('u')) showSite(p.get('u'));
-    else if (p.get('q')) showResults(p.get('q'), parseInt(p.get('p'), 10) || 0);
+    else if (p.get('q')) showResults(p.get('q'), parseInt(p.get('p'), 10) || 0, p.get('t') === 'images' ? 'images' : 'web');
     else showHome();
   }
   function show(name) {
@@ -259,27 +296,54 @@
     if (!embedded) $('#home-q').focus();
   }
 
-  async function showResults(q, p) {
+  const getSafe = () => {
+    try { if (embedded && typeof parent.willowSafe === 'function') return parent.willowSafe(); } catch {}
+    try { return localStorage.getItem('willow:safe') !== '0'; } catch { return true; }
+  };
+  const resParams = (q, p, t) => {
+    const o = { q };
+    if (p) o.p = p;
+    if (t === 'images') o.t = 'images';
+    return o;
+  };
+  let lastSafe = null;
+  let images = [];
+
+  async function showResults(q, p, type = 'web') {
     show('results');
-    last = { q, p };
+    closeLightbox();
+    last = { q, p, t: type };
+    lastSafe = getSafe();
     frame.removeAttribute('src');
     delete frame.dataset.cur;
     document.title = q + ' — Willow';
     $('#top-q').value = q;
     $('#pager').hidden = true;
     $('#meta').textContent = '';
-    $('#list').innerHTML = '<div class="skeleton"></div>'.repeat(5);
+    $('#col').classList.toggle('wide', type === 'images');
+    document.querySelectorAll('#types button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.type === type)));
+    $('#list').innerHTML = type === 'images'
+      ? '<div class="grid">' + '<div class="skeleton"></div>'.repeat(12) + '</div>'
+      : '<div class="skeleton"></div>'.repeat(5);
     const mine = ++ticket;
     try {
-      const r = await fetch('/api/search?q=' + encodeURIComponent(q) + '&page=' + p);
+      const r = await fetch('/api/search?q=' + encodeURIComponent(q) + '&page=' + p + '&type=' + type + '&safe=' + (lastSafe ? '1' : '0'));
       const data = await r.json();
       if (mine !== ticket) return;
       if (!r.ok) throw new Error(data.error || 'Search failed.');
-      renderResults(data);
+      data.type === 'images' ? renderImages(data) : renderResults(data);
     } catch (err) {
       if (mine !== ticket) return;
-      $('#list').innerHTML = `<div class="notice"><strong>Search didn’t go through</strong>${esc(err.message)}</div>`;
+      $('#list').innerHTML = `<div class="notice"><strong>${type === 'images' ? 'Images' : 'Search'} didn’t go through</strong>${esc(err.message)}</div>`;
     }
+  }
+
+  function setPager(d) {
+    $('#pager').hidden = d.page === 0 && !d.hasMore;
+    $('#prev').disabled = d.page === 0;
+    $('#next').disabled = !d.hasMore;
+    $('#pageno').textContent = 'Page ' + (d.page + 1);
+    window.scrollTo(0, 0);
   }
 
   function renderResults(d) {
@@ -300,12 +364,53 @@
         <a class="title" href="?u=${encodeURIComponent(r.url)}" data-u="${esc(r.url)}">${esc(r.title)}</a>
         ${r.description ? `<p>${esc(r.description)}</p>` : ''}
       </article>`).join('');
-    $('#pager').hidden = d.page === 0 && !d.hasMore;
-    $('#prev').disabled = d.page === 0;
-    $('#next').disabled = !d.hasMore;
-    $('#pageno').textContent = 'Page ' + (d.page + 1);
-    window.scrollTo(0, 0);
+    setPager(d);
   }
+
+  function renderImages(d) {
+    images = d.results;
+    if (!images.length) {
+      $('#list').innerHTML = `<div class="notice"><strong>No images for “${esc(d.query)}”</strong>Try different words or a more general search.</div>`;
+      return;
+    }
+    $('#list').innerHTML = '<div class="grid">' + images.map((r, i) => `
+      <button class="tile" type="button" data-i="${i}" title="${esc(r.title)}">
+        <img src="${esc(proxied(r.thumb || r.url))}" alt="${esc(r.title)}" loading="lazy" onerror="this.closest('.tile').remove()">
+        <span>${esc(r.source)}</span>
+      </button>`).join('') + '</div>';
+    setPager(d);
+  }
+
+  /* ----- image preview ----- */
+  const lb = $('#lb');
+  let lbTile = null;
+  function openLightbox(i, tile) {
+    const r = images[i];
+    if (!r) return;
+    lbTile = tile;
+    const img = $('#lb-img');
+    img.onerror = () => { img.onerror = null; img.src = proxied(r.thumb || r.url); };
+    img.alt = r.title || '';
+    img.src = proxied(r.url);
+    $('#lb-title').textContent = r.title || '';
+    $('#lb-src').textContent = r.source || '';
+    $('#lb-visit').dataset.u = r.pageUrl || '';
+    $('#lb-visit').hidden = !r.pageUrl;
+    $('#lb-open').href = r.url;
+    lb.hidden = false;
+    $('#lb-close').focus();
+  }
+  function closeLightbox() {
+    if (lb.hidden) return;
+    lb.hidden = true;
+    $('#lb-img').removeAttribute('src');
+    if (lbTile && lbTile.isConnected) lbTile.focus();
+  }
+
+  // Called by the tab shell when SafeSearch is switched.
+  window.willowSyncSafe = () => {
+    if (!views.results.hidden && last.q && lastSafe !== getSafe()) showResults(last.q, last.p, last.t);
+  };
 
   function showSite(url) {
     show('site');
@@ -325,19 +430,35 @@
   $('#top-form').addEventListener('submit', (e) => { e.preventDefault(); submitQuery($('#top-q').value); });
   $('#addr-form').addEventListener('submit', (e) => { e.preventDefault(); submitQuery(addr.value); });
   $('#to-home').addEventListener('click', (e) => { e.preventDefault(); go({}); });
-  $('#prev').addEventListener('click', () => go({ q: last.q, p: Math.max(0, last.p - 1) }));
-  $('#next').addEventListener('click', () => go({ q: last.q, p: last.p + 1 }));
-  $('#back').addEventListener('click', () => (last.q ? go({ q: last.q, p: last.p }) : go({})));
+  $('#prev').addEventListener('click', () => go(resParams(last.q, Math.max(0, last.p - 1), last.t)));
+  $('#next').addEventListener('click', () => go(resParams(last.q, last.p + 1, last.t)));
+  $('#back').addEventListener('click', () => (last.q ? go(resParams(last.q, last.p, last.t)) : go({})));
   $('#reload').addEventListener('click', () => {
     bar.className = ''; void bar.offsetWidth; bar.className = 'on';
     try { frame.contentWindow.location.reload(); } catch { frame.src = frame.src; }
   });
   $('#list').addEventListener('click', (e) => {
+    const tile = e.target.closest('.tile');
+    if (tile) { openLightbox(+tile.dataset.i, tile); return; }
     const a = e.target.closest('a.title');
     if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
     e.preventDefault();
     go({ u: a.dataset.u });
   });
+  $('#types').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-type]');
+    if (b && last.q && b.dataset.type !== last.t) go(resParams(last.q, 0, b.dataset.type));
+  });
+  $('#lb-close').addEventListener('click', closeLightbox);
+  lb.addEventListener('click', (e) => { if (e.target === lb) closeLightbox(); });
+  $('#lb-visit').addEventListener('click', () => {
+    const u = $('#lb-visit').dataset.u;
+    if (!u) return;
+    lbTile = null;
+    closeLightbox();
+    go({ u });
+  });
+  addEventListener('keydown', (e) => { if (e.key === 'Escape') closeLightbox(); });
   frame.addEventListener('load', () => { bar.className = 'done'; });
   addEventListener('popstate', route);
   addEventListener('message', (e) => {
