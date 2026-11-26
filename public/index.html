@@ -32,8 +32,10 @@
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
   body { display: flex; flex-direction: column; background: var(--mist); color: var(--ink); font: 400 14px/1.4 var(--sans); -webkit-font-smoothing: antialiased; }
+  button { font: inherit; }
   :focus-visible { outline: 2px solid var(--leaf); outline-offset: -2px; }
 
+  /* ---------- tab strip ---------- */
   #strip { display: flex; align-items: flex-end; gap: 4px; padding: 8px 8px 0; background: var(--strip); user-select: none; -webkit-user-select: none; }
   #tabs { display: flex; align-items: flex-end; gap: 2px; min-width: 0; flex: 0 1 auto; }
   .tab {
@@ -54,12 +56,29 @@
   .title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .x { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; padding: 0; }
   .x:hover { background: color-mix(in srgb, var(--ink) 16%, transparent); }
-  .x svg, #new svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+  .x svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
   #new { flex: none; display: grid; place-items: center; width: 30px; height: 30px; margin-bottom: 3px; border: 0; border-radius: 50%; background: transparent; color: var(--ink-soft); cursor: pointer; padding: 0; }
-  #new svg { width: 14px; height: 14px; }
+  #new svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
   #new:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 12%, transparent); color: var(--ink); }
   #new:disabled { opacity: .35; cursor: default; }
 
+  /* ---------- address bar ---------- */
+  #toolbar { display: flex; align-items: center; gap: 4px; padding: 6px 10px; background: var(--mist); border-bottom: 1px solid var(--line); }
+  .nav { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 50%; background: transparent; color: var(--ink); cursor: pointer; padding: 0; text-decoration: none; }
+  .nav svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .nav:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 10%, transparent); }
+  .nav:disabled { opacity: .35; cursor: default; }
+  .nav[hidden] { display: none; }
+  #omni-form { flex: 1; min-width: 0; margin: 0 4px; }
+  #omni {
+    width: 100%; height: 34px; padding: 0 16px; border: 1px solid transparent; border-radius: 999px;
+    background: var(--strip); color: var(--ink); font: inherit; font-size: .95rem; outline: 0;
+    transition: background .15s, box-shadow .15s;
+  }
+  #omni::placeholder { color: var(--ink-soft); }
+  #omni:focus { background: var(--mist); border-color: var(--leaf); box-shadow: 0 0 0 3px color-mix(in srgb, var(--leaf) 25%, transparent); }
+
+  /* ---------- pages ---------- */
   #stage { position: relative; flex: 1; min-height: 0; }
   .pane { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: none; background: var(--mist); }
   .pane.on { display: block; }
@@ -70,6 +89,17 @@
   <div id="tabs" role="tablist" aria-label="Tabs"></div>
   <button id="new" type="button" aria-label="New tab" title="New tab"><svg viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></svg></button>
 </div>
+
+<div id="toolbar">
+  <button class="nav" id="back" type="button" aria-label="Back" title="Back" disabled><svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+  <button class="nav" id="fwd" type="button" aria-label="Forward" title="Forward" disabled><svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+  <button class="nav" id="reload" type="button" aria-label="Reload" title="Reload"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button>
+  <form id="omni-form" role="search">
+    <input id="omni" type="text" placeholder="Search or enter an address" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Search or enter an address">
+  </form>
+  <a class="nav" id="orig" href="#" target="_blank" rel="noopener noreferrer" aria-label="Open the original site in a new browser tab" title="Open the original site" hidden><svg viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>
+</div>
+
 <div id="stage"></div>
 
 <script>
@@ -77,9 +107,9 @@
   const BLANK = '/app.html';
   const MAX = 15;
   const KEY = 'willow:tabs';
-  const tabsEl = document.getElementById('tabs');
-  const stage = document.getElementById('stage');
-  const newBtn = document.getElementById('new');
+  const $ = (id) => document.getElementById(id);
+  const tabsEl = $('tabs'), stage = $('stage'), newBtn = $('new');
+  const omni = $('omni'), backBtn = $('back'), fwdBtn = $('fwd'), origBtn = $('orig');
   const CLOSE_ICON = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 
   let tabs = [];
@@ -89,7 +119,20 @@
   let lastSaved = '';
 
   const proxied = (u) => '/api/proxy?url=' + encodeURIComponent(u);
+  const looksLikeUrl = (s) => /^https?:\/\//i.test(s) || /^(?!.*\s)([a-z0-9-]+\.)+[a-z]{2,}(:\d+)?(\/\S*)?$/i.test(s);
+  const toUrl = (s) => (/^https?:\/\//i.test(s) ? s : 'https://' + s);
 
+  // Two addresses that only differ by http/https, www or a trailing slash count as the same page.
+  function norm(src) {
+    try {
+      const u = new URLSearchParams(src.split('?')[1] || '').get('u');
+      if (!u) return src;
+      const x = new URL(u);
+      return x.hostname.replace(/^www\./, '').toLowerCase() + x.pathname.replace(/\/$/, '') + x.search;
+    } catch { return src; }
+  }
+
+  /* ---------- tabs ---------- */
   function create(src = BLANK, select = true) {
     if (tabs.length >= MAX) return null;
     const id = ++seq;
@@ -108,11 +151,12 @@
     el.tabIndex = -1;
     el.innerHTML = '<img class="fav" alt="" src="/favicon.svg"><span class="title">New tab</span><button class="x" type="button" aria-label="Close tab" tabindex="-1">' + CLOSE_ICON + '</button>';
 
-    const tab = { id, el, frame, src, label: 'New tab', host: '' };
+    const tab = { id, el, frame, src, hist: [src], idx: 0, pending: null, settleUntil: 0, label: 'New tab', host: '', display: '' };
     tabs.push(tab);
     tabsEl.appendChild(el);
     stage.appendChild(frame);
 
+    frame.addEventListener('load', () => { tab.pending = null; });
     el.addEventListener('click', () => choose(tab));
     el.querySelector('.x').addEventListener('click', (e) => { e.stopPropagation(); close(tab); });
     el.addEventListener('auxclick', (e) => { if (e.button === 1) { e.preventDefault(); close(tab); } });
@@ -153,13 +197,11 @@
       t.el.tabIndex = on ? 0 : -1;
       t.frame.classList.toggle('on', on);
     }
+    omni.value = tab.display;
+    updateChrome();
     document.title = tab.label === 'New tab' ? 'Willow' : tab.label + ' — Willow';
-    try {
-      tab.frame.contentWindow.focus();
-      const d = tab.frame.contentDocument;
-      const home = d.getElementById('home');
-      if (home && !home.hidden) d.getElementById('home-q').focus();
-    } catch {}
+    if (tab.src === BLANK) omni.focus();
+    else { try { tab.frame.contentWindow.focus(); } catch {} }
     save();
   }
 
@@ -181,45 +223,131 @@
     const over = e.target.closest && e.target.closest('.tab');
     if (!over || over === dragging.el) return;
     const r = over.getBoundingClientRect();
-    const after = e.clientX > r.left + r.width / 2;
-    tabsEl.insertBefore(dragging.el, after ? over.nextSibling : over);
+    tabsEl.insertBefore(dragging.el, e.clientX > r.left + r.width / 2 ? over.nextSibling : over);
   });
 
-  /* Read each tab's page title and address so the tab strip stays in sync. */
+  /* ---------- per-tab history and navigation ---------- */
+  function load(tab, src) {
+    tab.pending = src;
+    tab.settleUntil = Date.now() + 4000;
+    tab.frame.src = src;
+  }
+
+  function navigate(tab, src) {
+    tab.hist = tab.hist.slice(0, tab.idx + 1);
+    tab.hist.push(src);
+    tab.idx++;
+    load(tab, src);
+    updateChrome();
+  }
+
+  function step(delta) {
+    const t = active;
+    if (!t) return;
+    const i = t.idx + delta;
+    if (i < 0 || i >= t.hist.length) return;
+    t.idx = i;
+    load(t, t.hist[i]);
+    updateChrome();
+  }
+
+  function updateChrome() {
+    backBtn.disabled = !active || active.idx <= 0;
+    fwdBtn.disabled = !active || active.idx >= active.hist.length - 1;
+    const d = active ? active.display : '';
+    origBtn.hidden = !/^https?:\/\//i.test(d);
+    if (!origBtn.hidden) origBtn.href = d;
+  }
+
+  backBtn.addEventListener('click', () => step(-1));
+  fwdBtn.addEventListener('click', () => step(1));
+  $('reload').addEventListener('click', () => {
+    if (!active) return;
+    try { active.frame.contentWindow.location.reload(); } catch { active.frame.src = active.frame.src; }
+  });
+
+  $('omni-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const v = omni.value.trim();
+    if (!v || !active) return;
+    const isUrl = looksLikeUrl(v);
+    active.display = isUrl ? toUrl(v) : v;
+    omni.value = active.display;
+    navigate(active, BLANK + (isUrl ? '?u=' + encodeURIComponent(toUrl(v)) : '?q=' + encodeURIComponent(v)));
+    omni.blur();
+    try { active.frame.contentWindow.focus(); } catch {}
+  });
+  omni.addEventListener('focus', () => omni.select());
+  omni.addEventListener('blur', () => { if (active) omni.value = active.display; });
+  omni.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { omni.value = active ? active.display : ''; omni.select(); }
+  });
+  newBtn.addEventListener('click', () => create());
+
+  /* ---------- keep the tab strip and address bar in sync with each tab ---------- */
   function sync() {
     for (const t of tabs) {
-      let title = '', search = '', path = '';
+      if (t.pending) continue;
+      let title = '', search = '', path = '', current = '';
       try {
         const w = t.frame.contentWindow;
         title = w.document.title || '';
         search = w.location.search;
         path = w.location.pathname;
+        current = w.willowCurrent || '';
       } catch { continue; }
 
-      const u = new URLSearchParams(search).get('u');
+      const params = new URLSearchParams(search);
+      const u = params.get('u');
+      const q = params.get('q');
       let host = '';
       if (u) { try { host = new URL(u).hostname; } catch {} }
 
       let label = title.replace(/\s+[—-]\s+Willow$/, '').trim();
       if (!label || label === 'Willow') label = host || 'New tab';
-
       if (label !== t.label) {
         t.label = label;
         t.el.querySelector('.title').textContent = label;
         t.el.title = label;
         if (t === active) document.title = label === 'New tab' ? 'Willow' : label + ' — Willow';
       }
+
       if (host !== t.host) {
         t.host = host;
         const img = t.el.querySelector('.fav');
         img.onerror = () => { img.onerror = null; img.src = '/favicon.svg'; };
         img.src = host ? proxied('https://www.google.com/s2/favicons?domain=' + host + '&sz=32') : '/favicon.svg';
       }
-      if (path.startsWith(BLANK)) t.src = path + search;
+
+      const display = u ? current || u : q || '';
+      if (display !== t.display) {
+        t.display = display;
+        if (t === active) {
+          if (document.activeElement !== omni) omni.value = display;
+          updateChrome();
+        }
+      }
+
+      if (path.startsWith(BLANK)) {
+        const cur = path + search;
+        const known = t.hist[t.idx];
+        if (cur !== known) {
+          if (Date.now() < t.settleUntil || norm(cur) === norm(known)) {
+            t.hist[t.idx] = cur;
+          } else {
+            t.hist = t.hist.slice(0, t.idx + 1);
+            t.hist.push(cur);
+            t.idx++;
+          }
+          if (t === active) updateChrome();
+        }
+        t.src = cur;
+      }
     }
     save();
   }
 
+  /* ---------- remember tabs across refreshes ---------- */
   function save() {
     try {
       const data = JSON.stringify({ tabs: tabs.map((t) => t.src), active: tabs.indexOf(active) });
@@ -228,7 +356,6 @@
   }
 
   function restore() {
-    // A link like /?q=cats opens as the first tab.
     if (location.search) {
       const first = create(BLANK + location.search);
       history.replaceState(null, '', location.pathname);
@@ -247,8 +374,7 @@
     create();
   }
 
-  newBtn.addEventListener('click', () => create());
-  setInterval(sync, 500);
+  setInterval(sync, 400);
   restore();
 })();
 </script>
