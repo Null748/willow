@@ -232,7 +232,6 @@
     omni.value = tab.display;
     updateChrome();
     syncSafe(tab);
-    document.title = tab.label === 'New tab' ? 'Willow' : tab.label + ' — Willow';
     if (tab.src === BLANK) omni.focus();
     else { try { tab.frame.contentWindow.focus(); } catch {} }
     save();
@@ -342,7 +341,6 @@
         t.label = label;
         t.el.querySelector('.title').textContent = label;
         t.el.title = label;
-        if (t === active) document.title = label === 'New tab' ? 'Willow' : label + ' — Willow';
       }
 
       if (host !== t.host) {
