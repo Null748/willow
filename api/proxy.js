@@ -94,6 +94,9 @@ export default async function handler(req, res) {
       const v = upstream.headers.get(h);
       if (v) res.setHeader(h, v);
     }
+    if (req.method === 'GET' && upstream.ok && type.startsWith('image/')) {
+      res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=86400');
+    }
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     res.status(upstream.status);
