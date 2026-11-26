@@ -141,6 +141,7 @@
   #bar.done { opacity: 0; transform: scaleX(1); transition: transform .2s, opacity .4s .2s; }
   #frame { flex: 1; width: 100%; border: 0; background: #fff; }
   @media (max-width: 640px) { .viewbar .label, .viewbar .mark { display: none; } }
+  .embedded .viewbar, .embedded .topbar { display: none; }
 </style>
 </head>
 <body>
@@ -201,6 +202,8 @@
   const frame = $('#frame'), addr = $('#addr'), bar = $('#bar');
   let last = { q: '', p: 0 };
   let ticket = 0;
+  const embedded = window.parent !== window;
+  if (embedded) document.body.classList.add('embedded');
 
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const proxied = (u) => '/api/proxy?url=' + encodeURIComponent(u);
@@ -229,7 +232,7 @@
   /* ----- routing: ?q=..&p=.. for results, ?u=.. for a page ----- */
   function go(params, replace) {
     const qs = new URLSearchParams(params).toString();
-    history[replace ? 'replaceState' : 'pushState'](null, '', qs ? '?' + qs : location.pathname);
+    history[replace || embedded ? 'replaceState' : 'pushState'](null, '', qs ? '?' + qs : location.pathname);
     route();
   }
   function route() {
@@ -253,7 +256,7 @@
     document.title = 'Willow';
     frame.removeAttribute('src');
     delete frame.dataset.cur;
-    $('#home-q').focus();
+    if (!embedded) $('#home-q').focus();
   }
 
   async function showResults(q, p) {
@@ -306,6 +309,7 @@
 
   function showSite(url) {
     show('site');
+    window.willowCurrent = null;
     addr.value = url;
     $('#original').href = url;
     if (frame.dataset.cur === url) return;
@@ -341,6 +345,7 @@
     const d = e.data;
     if (!d || d.type !== 'willow:nav' || !d.url) return;
     addr.value = d.url;
+    window.willowCurrent = d.url;
     frame.dataset.cur = d.url;
     $('#original').href = d.url;
     if (d.title) document.title = d.title + ' — Willow';
